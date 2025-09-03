@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ASU Core GPA Calculator — ASU</title>
+<style>
+  :root{
+    --maroon:#8C1D40;
+    --maroon-dark:#6D1632;
+    --gold:#FFC627;
+    --ink:#111827;
+    --muted:#6B7280;
+    --ok:#059669;
+    --warn:#B45309;
+    --bad:#B91C1C;
+    --bg:#ffffff;
+    --card:#ffffff;
+    --line:#E5E7EB;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--ink); background:var(--bg)}
+  .brandbar{height:8px; background:linear-gradient(90deg,var(--maroon),var(--maroon-dark))}
+  a{color:var(--maroon); text-decoration:underline}
+  h1{margin:18px 16px 8px; color:var(--maroon)}
+  .wrap{padding:0 16px 28px}
+  /* Responsive grid with template areas to control order */
+  .grid{
+    display:grid;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "inputs"
+      "more"
+      "results"; /* results always last on mobile */
+    gap:16px;
+    align-items:start
+  }
+  @media (min-width: 1100px){
+    .grid{
+      grid-template-columns: minmax(540px, 1.15fr) minmax(420px,.85fr);
+      grid-template-areas:
+        "inputs results"
+        "more   results";
+    }
+  }
+  .area-inputs{grid-area:inputs}
+  .area-results{grid-area:results}
+  .area-more{grid-area:more}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden}
+  .card .hd{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:2px solid var(--maroon); background:#fff}
+  .card .hd h2{margin:0; font-size:20px; color:var(--maroon)}
+  .card .bd{padding:14px}
+  .qblock + .qblock{margin-top:16px}
+  .qblock h3{margin:0 0 8px; color:var(--maroon); padding-bottom:6px; border-bottom:2px solid var(--gold)}
+  label{display:inline-block; margin:6px 0}
+  select, input[type="number"], input[type="text"], input[type="password"]{
+    width:130px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; font-size:14px; background:#fff;
+  }
+  select:focus, input:focus{outline:2px solid var(--maroon); box-shadow:0 0 0 1px var(--maroon)}
+  .row{margin-bottom:14px}
+  .note{font-size:12px; color:var(--muted)}
+  .btn{display:inline-block; padding:10px 14px; border-radius:10px; border:1px solid var(--maroon-dark); background:var(--maroon); color:#fff; font-weight:700; cursor:pointer}
+  .btn:hover{filter:brightness(1.03)}
+  .btn.secondary{background:#fff; color:var(--maroon); border:1px solid var(--maroon)}
+  .pill{display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid var(--line); font-weight:700}
+  .pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+  .callout{border:1px solid var(--line); padding:12px; border-radius:10px; margin-top:10px}
+  .callout strong{color:var(--maroon)}
+  .hero{margin:8px 0 0; padding:16px; border-radius:12px; border:2px solid var(--maroon); background:#fff}
+  .hero.ok{border-color:rgba(5,150,105,.65)}
+  .hero.bad{border-color:rgba(185,28,28,.65)}
+  .hero.warn{border-color:rgba(180,83,9,.6)}
+  .hero h3{margin:0 0 4px; color:var(--maroon)}
+  .out .line{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px dashed var(--line)}
+  .out .line:last-child{border-bottom:none}
+  #confetti{position:absolute; inset:0; pointer-events:none}
+  .hidden{display:none !important}
+
+  /* Course section accent */
+  .courseSec{border:1px solid var(--line); border-left:4px solid var(--maroon); border-radius:12px; padding:12px; background:#fff}
+
+  /* Subtitle above, options below */
+  .courseTitle{display:block; font-weight:700; color:var(--maroon); margin:4px 0 8px}
+  .semgrid{
+    display:grid;
+    grid-auto-flow:column;
+    grid-auto-columns: max-content;
+    gap:8px 12px;
+    align-items:center;
+  }
+  .semgrid .sub{font-size:12px; color:var(--muted); white-space:nowrap;}
+  .semgrid select{width:130px}
+
+  /* Specific 2/2 stacking for Second Language across all widths */
+  .semgrid.lang{
+    grid-auto-flow:row;
+    grid-template-columns: repeat(2, max-content 1fr);
+  }
+  .semgrid.lang select{width:100%}
+
+  /* Responsive wrap for other semgrids */
+  @media (max-width: 900px){
+    .semgrid{grid-auto-flow:row; grid-template-columns: repeat(2, max-content 1fr);}
+    .semgrid select{width:100%}
+  }
+
+  /* Footer calculate button */
+  .footer-cta{margin-top:20px; text-align:center}
+
+  /* Validation */
+  .invalid{border-color:var(--bad) !important; box-shadow:0 0 0 1px var(--bad) !important;}
+  .warntext{color:var(--bad); font-size:12px; margin-top:4px}
+  ul.stack{margin:8px 0 0 18px; padding:0}
+  ul.stack li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="brandbar" aria-hidden="true"></div>
+<h1>ASU Core GPA Calculator</h1>
+<div class="wrap">
+  <div class="grid" id="app">
+
+    <!-- Left: inputs -->
+    <section class="card area-inputs" id="inputs-card" aria-labelledby="inputs-h">
+      <div class="hd"><h2 id="inputs-h">Your info & grades</h2><span class="note" id="save-ind">v2.7</span></div>
+      <div class="bd">
+
+        <!-- Reporting (optional at top with counselor code gate) -->
+        <div class="qblock" id="reporting">
+          <h3>Reporting (optional)</h3>
+          <div class="note">Only report if instructed by your counselor and submit only once per semester.</div>
+          <div class="row">
+            <label for="reportToggle">Report results to school?</label>
+            <select id="reportToggle"><option value="no">No</option><option value="yes">Yes</option></select>
+          </div>
+          <div id="codeGate" class="hidden" style="margin-top:6px">
+            <div class="row">
+              <label for="counselorCode">Counselor code</label>
+              <input type="password" id="counselorCode" placeholder="Enter code to unlock" />
+              <button class="btn secondary" id="unlockBtn" type="button">Unlock</button>
+            </div>
+            <div class="note">Ask your counselor for this code.</div>
+          </div>
+          <div id="reportFields" class="hidden" style="margin-top:8px">
+            <div class="row"><label for="district">District</label><input type="text" id="district" placeholder="e.g., Tempe Union"></div>
+            <div class="row"><label for="school">School</label><input type="text" id="school" placeholder="e.g., Desert Vista HS"></div>
+            <div class="row"><label for="studentId">Student ID</label><input type="text" id="studentId" placeholder="Digits only" inputmode="numeric"></div>
+            <div class="note">Submissions are for informational purposes only — final admissions decisions come from ASU Admissions after transcript review.</div>
+          </div>
+        </div>
+
+        <!-- About you -->
+        <div class="qblock">
+          <h3>About you</h3>
+          <div class="row">
+            <label for="grade-level">Grade level</label>
+            <select id="grade-level">
+              <option value="">Select grade</option>
+              <option value="9">Freshman (9th)</option>
+              <option value="10">Sophomore (10th)</option>
+              <option value="11">Junior (11th)</option>
+              <option value="12">Senior (12th)</option>
+            </select>
+            <div id="grade-warn" class="warntext hidden">Please select your grade level.</div>
+          </div>
+          <div class="row">
+            <label for="top25">Top 25% of class?</label>
+            <select id="top25"><option value="no">No / Not sure</option><option value="yes">Yes</option></select>
+          </div>
+        </div>
+
+        <!-- Test scores -->
+        <div class="qblock">
+          <h3>Test scores (optional)</h3>
+          <div class="row">
+            <label for="testScoreToggle">Enter ACT/SAT scores?</label>
+            <select id="testScoreToggle"><option value="no">No</option><option value="yes">Yes</option></select>
+          </div>
+          <div id="testScoreSection" class="hidden" style="margin-top:8px">
+            <fieldset style="border:none; padding:0; margin:0 0 10px 0">
+              <legend class="note" style="color:var(--ink)">ACT</legend>
+              <div class="row semgrid">
+                <span class="courseTitle">ACT</span>
+                <span class="sub">Composite</span><input type="number" id="actComposite" min="1" max="36" placeholder="22" style="width:120px">
+                <span class="sub">English</span><input type="number" id="actEnglish" min="0" max="36" placeholder="21" style="width:120px">
+                <span class="sub">Math</span><input type="number" id="actMath" min="0" max="36" placeholder="24" style="width:120px">
+              </div>
+            </fieldset>
+            <fieldset style="border:none; padding:0; margin:0">
+              <legend class="note" style="color:var(--ink)">SAT</legend>
+              <div class="row semgrid">
+                <span class="courseTitle">SAT</span>
+                <span class="sub">Total</span><input type="number" id="satTotal" min="400" max="1600" placeholder="1120" style="width:130px">
+                <span class="sub">ERW</span><input type="number" id="satEnglish" min="200" max="800" placeholder="580" style="width:120px">
+                <span class="sub">Math</span><input type="number" id="satMath" min="200" max="800" placeholder="580" style="width:120px">
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        <!-- English -->
+        <div class="qblock courseSec" data-area="english">
+          <h3>English (4 credits)</h3>
+          <div class="row">
+            <span class="courseTitle">Freshman English</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="eng9s1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="eng9s2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Sophomore English</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="eng10s1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="eng10s2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Junior English</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="eng11s1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="eng11s2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Senior English</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="eng12s1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="eng12s2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Math -->
+        <div class="qblock courseSec" data-area="math">
+          <h3>Math (4 credits)</h3>
+          <div class="row">
+            <span class="courseTitle">Algebra I</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="alg1s1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="alg1s2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Geometry</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="geoms1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="geoms2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Algebra II</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="alg2s1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="alg2s2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Advanced Math</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="advms1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="advms2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lab Science -->
+        <div class="qblock courseSec" data-area="lab">
+          <h3>Lab Science (3 credits)</h3>
+          <div class="row">
+            <span class="courseTitle">Biology</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="bios1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="bios2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Chemistry</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="chems1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="chems2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Physics/Earth Science</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="phys1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="phys2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Right: results -->
+    <aside class="card area-results" aria-labelledby="r-h" style="position:relative">
+      <div class="hd"><h2 id="r-h">Results</h2><span id="status-pill" class="pill">Waiting…</span></div>
+      <div class="bd" id="results-bd">
+        <canvas id="confetti" class="hidden"></canvas>
+        <div id="hero" class="hero hidden"></div>
+
+        <div class="out" id="summary" style="margin-top:8px">
+          <div class="line"><span>ASU Core GPA</span><strong id="gpa">—</strong></div>
+          <div class="line"><span>Credits counted</span><strong id="credits">0.0</strong></div>
+        </div>
+
+        <div id="messages" style="margin-top:12px"></div>
+
+        <div class="callout" style="margin-top:14px; font-size:13px">
+          Guidance is based on <strong>ASU competency requirements</strong> and unweighted grades. For official info, see
+          the <a href="https://admission.asu.edu/apply/first-year/competency-requirements" target="_blank" rel="noopener">competency requirements</a> and
+          the <a href="https://admission.asu.edu/requirements" target="_blank" rel="noopener">ASU admission requirements</a>.
+        </div>
+
+        <details class="callout" style="margin-top:12px">
+          <summary><strong>How this result was decided</strong></summary>
+          <div id="explain-body" style="margin-top:8px; font-size:14px"></div>
+        </details>
+
+        <div class="row" style="margin-top:14px">
+          <button class="btn secondary" id="print" type="button">Print / PDF</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Additional left-column sections -->
+    <section class="card area-more">
+      <div class="bd">
+        <!-- Social Studies -->
+        <div class="qblock courseSec" data-area="social">
+          <h3>Social Studies (2 credits)</h3>
+          <div class="row">
+            <span class="courseTitle">American History</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="amhists1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="amhists2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Government</span>
+            <div class="semgrid">
+              <span class="sub">Semester</span><select id="govs1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <span class="courseTitle">Economics</span>
+            <div class="semgrid">
+              <span class="sub">Semester</span><select id="ecos1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Second language (always 2/2) -->
+        <div class="qblock courseSec" data-area="lang">
+          <h3>Second Language (2 credits)</h3>
+          <div class="row">
+            <span class="courseTitle">Same language</span>
+            <div class="semgrid lang">
+              <span class="sub">Semester 1</span><select id="langs1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="langs2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 3</span><select id="langs3"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 4</span><select id="langs4"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fine Arts / CTE -->
+        <div class="qblock courseSec" data-area="arts">
+          <h3>Fine Arts or CTE (1 credit)</h3>
+          <div class="row">
+            <span class="courseTitle">Course</span>
+            <div class="semgrid">
+              <span class="sub">Semester 1</span><select id="fa1"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+              <span class="sub">Semester 2</span><select id="fa2"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Footer calculate button -->
+  <div class="footer-cta">
+    <button class="btn" id="calc-bottom" type="button">Calculate GPA</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const COUNSELOR_PASS = 'ASUTEST2025';
+  const G = { A:4, B:3, C:2, D:1, F:0 };
+
+  // Reporting toggle + counselor code gate
+  const reportToggle = document.getElementById('reportToggle');
+  const codeGate = document.getElementById('codeGate');
+  const reportFields = document.getElementById('reportFields');
+  reportToggle.addEventListener('change', e=>{
+    const on = e.target.value === 'yes';
+    codeGate.classList.toggle('hidden', !on);
+    if (!on){ reportFields.classList.add('hidden'); document.getElementById('counselorCode').value=''; }
+  });
+  document.getElementById('unlockBtn').addEventListener('click', ()=>{
+    const input = document.getElementById('counselorCode');
+    const ok = (input.value||'').trim() === COUNSELOR_PASS;
+    input.style.borderColor = ok ? '#10B981' : '#EF4444';
+    reportFields.classList.toggle('hidden', !ok);
+  });
+
+  // Test score toggle
+  document.getElementById('testScoreToggle').addEventListener('change', e=>{
+    document.getElementById('testScoreSection').classList.toggle('hidden', e.target.value !== 'yes');
+  });
+
+  // Helpers
+  const num = v => (v==null || v==='') ? NaN : Number(v);
+  const letterToPts = v => (v && G[v] != null) ? G[v] : NaN;
+  const sel = id => document.getElementById(id);
+  function collectLetters(ids){
+    const vals = [];
+    ids.forEach(i=>{
+      const el = sel(i);
+      const v = el ? el.value : '';
+      if (v) vals.push(letterToPts(v));
+    });
+    return vals.filter(x=>!Number.isNaN(x));
+  }
+  function sum(a){ return a.reduce((x,y)=>x+y,0); }
+  const creditPerSem = 0.5;
+
+  function computeParts(){
+    const parts = {};
+    const eng = collectLetters(['eng9s1','eng9s2','eng10s1','eng10s2','eng11s1','eng11s2','eng12s1','eng12s2']);
+    parts.english = { sem: eng.length, gpa: eng.length? sum(eng)/eng.length : 0 };
+    const math = collectLetters(['alg1s1','alg1s2','geoms1','geoms2','alg2s1','alg2s2','advms1','advms2']);
+    parts.math = { sem: math.length, gpa: math.length? sum(math)/math.length : 0 };
+    const lab = collectLetters(['bios1','bios2','chems1','chems2','phys1','phys2']);
+    parts.lab = { sem: lab.length, gpa: lab.length? sum(lab)/lab.length : 0 };
+    const social = collectLetters(['amhists1','amhists2','govs1','ecos1']);
+    parts.social = { sem: social.length, gpa: social.length? sum(social)/social.length : 0 };
+    const lang = collectLetters(['langs1','langs2','langs3','langs4']);
+    parts.lang = { sem: lang.length, gpa: lang.length? sum(lang)/lang.length : 0 };
+    const arts = collectLetters(['fa1','fa2']);
+    parts.arts = { sem: arts.length, gpa: arts.length? sum(arts)/arts.length : 0 };
+
+    const totalSem = eng.length + math.length + lab.length + social.length + lang.length + arts.length;
+    const totalPts = sum(eng)+sum(math)+sum(lab)+sum(social)+sum(lang)+sum(arts);
+    const coreGPA = totalSem ? (totalPts/totalSem) : 0;
+    const credits = totalSem * creditPerSem;
+    return { parts, coreGPA, credits };
+  }
+
+  function competency(parts){
+    const need = { english:4, math:4, lab:3, social:2, lang:2, arts:1 };
+    const missing = {};
+    const gpaDef = new Set();
+    const missingAreas = new Set();
+
+    Object.keys(need).forEach(k=>{
+      const haveCredits = (parts[k].sem||0) * creditPerSem;
+      const miss = Math.max(0, need[k] - haveCredits);
+      missing[k] = miss;
+      if (miss > 0) missingAreas.add(k);
+      const hasAny = (parts[k].sem||0) > 0;
+      if (hasAny && parts[k].gpa < 2.0) gpaDef.add(k);
+    });
+
+    const missingList = Object.entries(missing)
+      .filter(([,v])=>v>0)
+      .map(([k,v])=>({english:'English', math:'Math', lab:'Lab Science', social:'Social Studies', lang:'Second Language', arts:'Fine Arts/CTE'}[k] + ': ' + v.toFixed(1) + ' credit(s)'));
+
+    const considered = new Set([...gpaDef, ...missingAreas]);
+    return { missingList, considered };
+  }
+
+  function allowedDefOk(considered){
+    const hasMath = considered.has('math');
+    const hasLab  = considered.has('lab');
+    return (considered.size <= 2) && !(hasMath && hasLab);
+  }
+
+  function setPill(text, kind){
+    const pill = sel('status-pill');
+    pill.textContent = text;
+    pill.className = 'pill ' + (kind||'');
+  }
+
+  function renderHero(kind, title, body){
+    const hero = sel('hero');
+    hero.className = 'hero ' + (kind||'');
+    hero.innerHTML = '<h3>'+title+'</h3><p>'+body+'</p>';
+    hero.classList.remove('hidden');
+  }
+
+  function confetti(){
+    const cvs = sel('confetti'), ctx = cvs.getContext('2d');
+    const box = sel('results-bd').getBoundingClientRect();
+    const DPR = window.devicePixelRatio||1;
+    cvs.width = Math.max(1, box.width*DPR);
+    cvs.height = Math.max(1, box.height*DPR);
+    cvs.style.width = box.width+'px'; cvs.style.height = box.height+'px';
+    cvs.classList.remove('hidden');
+    const colors = ['#8C1D40','#FFC627'];
+    const N = 160, pieces=[];
+    for(let i=0;i<N;i++) pieces.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height,r:4+Math.random()*6,a:Math.random()*Math.PI*2,v:2+Math.random()*3,w:(Math.random()<.5?1:-1)*(1+Math.random()),c:colors[(Math.random()*colors.length)|0]});
+    let t0=null; function step(ts){ if(!t0) t0=ts; const dt=ts-t0; ctx.clearRect(0,0,cvs.width,cvs.height);
+      pieces.forEach(p=>{ p.y+=p.v; p.x+=Math.sin(p.y/25)*1.2; p.a+=0.1*p.w; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.a); ctx.fillStyle=p.c; ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r); ctx.restore(); });
+      if(dt<2600) requestAnimationFrame(step); else { ctx.clearRect(0,0,cvs.width,cvs.height); cvs.classList.add('hidden'); }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function geq(a,b){ return (a-b) >= -1e-6; }
+
+  function listHTML(items){
+    if (!items || !items.length) return '';
+    return '<ul class="stack">' + items.map(x=>'<li>'+x+'</li>').join('') + '</ul>';
+  }
+
+  function calculate(){
+    // Grade selection required
+    const gradeSel = sel('grade-level');
+    const gradeVal = gradeSel.value;
+    const warn = sel('grade-warn');
+    if (!gradeVal){
+      gradeSel.classList.add('invalid');
+      warn.classList.remove('hidden');
+      setPill('Select grade','warn');
+      renderHero('warn','Select your grade level','Please choose your current grade level to calculate your progress.');
+      document.getElementById('inputs-card').scrollIntoView({behavior:'smooth', block:'start'});
+      sel('messages').innerHTML = '';
+      sel('gpa').textContent = '—';
+      sel('credits').textContent = '0.0';
+      return;
+    } else {
+      gradeSel.classList.remove('invalid');
+      warn.classList.add('hidden');
+    }
+
+    const { parts, coreGPA, credits } = computeParts();
+    sel('gpa').textContent = credits ? coreGPA.toFixed(2) : '—';
+    sel('credits').textContent = credits.toFixed(1);
+
+    const { missingList, considered } = competency(parts);
+    const gradeLevel = parseInt(gradeVal,10);
+    const isSenior = gradeLevel === 12;
+
+    // Test & rank routes
+    const top25 = sel('top25').value === 'yes';
+    const actComp = num(sel('actComposite').value);
+    const satTot  = num(sel('satTotal').value);
+    const actEng  = num(sel('actEnglish').value);
+    const actMath = num(sel('actMath').value);
+    const satEng  = num(sel('satEnglish').value);
+    const satMath = num(sel('satMath').value);
+
+    const subjectThreshold = (actEng>=21 && actMath>=24) || (satEng>=580 && satMath>=580);
+    const allowedDef = allowedDefOk(considered);
+
+    // Senior = actual admissibility checks
+    const seniorAssured =
+      top25 ||
+      (actComp>=22) ||
+      (satTot>=1120) ||
+      (geq(coreGPA,3.0) && allowedDef);
+
+    // Underclass = on-track checks (ignore deficiency counting)
+    const underOnTrack =
+      top25 ||
+      (actComp>=22) ||
+      (satTot>=1120) ||
+      subjectThreshold ||
+      geq(coreGPA,3.0);
+
+    // Render hero + messages
+    sel('messages').innerHTML = '';
+    sel('hero').classList.add('hidden');
+
+    if (isSenior){
+      if (seniorAssured || subjectThreshold){
+        let reason = top25 ? 'top 25% class rank'
+                   : (actComp>=22) ? 'ACT composite ≥ 22'
+                   : (satTot>=1120) ? 'SAT total ≥ 1120'
+                   : subjectThreshold ? 'English & Math test thresholds'
+                   : '3.0+ core GPA';
+        const hasAllowedDef = allowedDef && considered.size>0;
+        const title = hasAllowedDef ? '🎉 You’re admissible — with an allowed deficiency!' : '🎉 You’re admissible!';
+        renderHero(hasAllowedDef?'warn':'ok', title, 'You qualify via ' + reason + '. Estimated core GPA: ' + (credits? coreGPA.toFixed(2):'—') + '.');
+        setPill('Admissible','ok');
+        confetti();
+        if (hasAllowedDef){
+          const link = '<a href="https://admission.asu.edu/apply/first-year/competency-requirements" target="_blank" rel="noopener">competency deficiency policy</a>';
+          const expl = 'ASU may admit students with a deficiency in no more than two competency areas (but not both Math and Lab Science).';
+          const box = document.createElement('div'); box.className='callout';
+          box.innerHTML = '<strong>Admissible with an allowed deficiency</strong><div style="margin-top:6px">'+ expl +' See the '+ link +'.</div>';
+          sel('messages').appendChild(box);
+        }
+      } else {
+        const mathAndLabBoth = considered.has('math') && considered.has('lab');
+        if (mathAndLabBoth){
+          const link = '<a href="https://admission.asu.edu/apply/first-year/competency-requirements" target="_blank" rel="noopener">competency deficiency policy</a>';
+          renderHero('bad','Competency deficiency','Admission with deficiencies does not allow both Math and Lab Science to be deficient at the same time. See the policy for your next steps.');
+          setPill('Deficiency','bad');
+          const box = document.createElement('div'); box.className='callout';
+          box.innerHTML = '<strong>Math & Lab Science both deficient</strong><div style="margin-top:6px">Improve one of these areas or qualify via another assured path. See the '+link+'.</div>';
+          sel('messages').appendChild(box);
+        } else {
+          setPill('Not yet eligible','warn');
+          renderHero('warn','You may qualify via other assured paths','Try one of these: top 25% of class, ACT ≥ 22, SAT ≥ 1120, or reach 3.0+ core GPA (within allowed-deficiency rules).');
+          if (missingList && missingList.length){
+            const prog = document.createElement('div'); prog.className='callout';
+            prog.innerHTML = '<strong>Items to finish for competencies</strong>' + listHTML(missingList);
+            sel('messages').appendChild(prog);
+          }
+        }
+      }
+    } else {
+      if (underOnTrack){
+        setPill('On track','ok');
+        renderHero('ok','🎉 You’re on track for assured admission!','Great job — based on your progress so far, you’re tracking toward admission. Keep finishing competencies.');
+        confetti();
+      } else if (coreGPA>=2.5){
+        setPill('Keep building','warn');
+        renderHero('warn','Keep building','Aim for a 3.0+ core GPA and finish competencies. You’re getting there!');
+      } else {
+        setPill('Needs improvement','bad');
+        renderHero('bad','Let’s raise that GPA','Focus on improving grades in core classes; every semester matters.');
+      }
+      if (missingList && missingList.length){
+        const prog = document.createElement('div'); prog.className='callout';
+        prog.innerHTML = '<strong>Items to finish for competencies</strong>' + listHTML(missingList);
+        sel('messages').appendChild(prog);
+      }
+    }
+
+    const defs = Array.from(considered).map(x=>({english:'English',math:'Math',lab:'Lab Science',social:'Social Studies',lang:'Second Language',arts:'Fine Arts/CTE'}[x]||x));
+    const reasons = [];
+    if (sel('top25').value==='yes') reasons.push('Top 25% class rank');
+    if (!Number.isNaN(num(sel('actComposite').value)) && num(sel('actComposite').value)>=22) reasons.push('ACT composite ≥ 22');
+    if (!Number.isNaN(num(sel('satTotal').value)) && num(sel('satTotal').value)>=1120) reasons.push('SAT total ≥ 1120');
+    if ( (num(sel('actEnglish').value)>=21 && num(sel('actMath').value)>=24) || (num(sel('satEnglish').value)>=580 && num(sel('satMath').value)>=580) ) reasons.push('English & Math test thresholds met');
+    reasons.push('3.0+ core GPA (senior: within allowed-deficiency rule)');
+    sel('explain-body').innerHTML =
+      '<div><strong>Grade:</strong> '+(sel('grade-level').value||'—')+'</div>'+
+      '<div><strong>Core GPA:</strong> '+(sel('gpa').textContent||'—')+'</div>'+
+      '<div><strong>Deficiency areas considered:</strong> '+(defs.length? defs.join(', ') : 'None')+'</div>'+
+      '<div><strong>Assured-admission checks:</strong> '+reasons.join(' • ')+'</div>';
+
+    document.getElementById('r-h').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  // Bind buttons
+  document.getElementById('calc-bottom').addEventListener('click', calculate);
+  document.getElementById('print').addEventListener('click', ()=> window.print());
+})();
+</script>
+</body>
+</html>
